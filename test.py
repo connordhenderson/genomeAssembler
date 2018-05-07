@@ -1,6 +1,7 @@
 import sys
 import itertools
 import time
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
 from collections import defaultdict
 
 # Given a list of strings 'str' and a size of a k-mer 'k', this will construct the set of nodes/edges for a De Bruijn graph
@@ -35,6 +36,35 @@ def pick_maximal_overlap(reads, k):
             reada, readb = a,b
             best_overlap_len = overlap_len
     return reada, readb, best_overlap_len
+
+def test(reads, k):
+    read_dict = dict()
+    list = []
+
+
+    index = 0
+    for a in reads:
+        current = None
+
+        # We want to remove this element so we aren't comparing it against itself
+        reads.pop(index)
+
+        for b in reads:
+            overlap_amt = overlap(a,b, min_length = 6)
+            if current == None or current < overlap_amt:
+                current = overlap_amt
+
+            # We now have the highest overlap for a read
+            read_dict[a] = b
+
+        reads.insert(index,a)
+        index += 1
+
+    for key, value in read_dict.items():
+        list.append([key,value])
+
+    return list
+
 
 # Uses the maximal overlaps to always combine the highest overlap values in order; not exhaustive but not always right.
 # This means we can get stuck in a cycle and need to find a way to break out of the cycle
@@ -139,26 +169,10 @@ def create_numbered_dict(edges, lookup):
 def print_circuit(circuit):
     return "d"
 
+seqrec = []
+with open(sys.argv[1]) as in_handle:
+    for title, seq, qual in FastqGeneralIterator(in_handle):
+        seqrec.append(seq)
 
-
-
-seq = "there_is_a_big_dog"
-seq = "QWERWERQRQWERWERWRW"
-nodes, edges = create_graph(seq, 8)
-print ("seq:   %s"%seq)
-print ("nodes: %s"%nodes)
-print ("edges: %s\n"%edges)
-
-
-start = time.time()
-
-lookup, reverse_lookup = number_vertices(edges)
-
-print(lookup)
-print(reverse_lookup)
-
-d = create_numbered_dict(edges, lookup)
-print(d)
-
-
-print("elapsed: %f"% (time.time() - start))
+edges = test(seqrec,3)
+print(len(edges), len(seqrec))
