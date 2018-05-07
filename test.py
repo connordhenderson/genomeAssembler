@@ -1,8 +1,12 @@
 import sys
 import itertools
 import time
+
 from Bio.SeqIO.QualityIO import FastqGeneralIterator
+from Bio import SeqIO
+
 from collections import defaultdict
+from drawDebruijn import draw as drawDeb
 
 # Given a list of strings 'str' and a size of a k-mer 'k', this will construct the set of nodes/edges for a De Bruijn graph
 def create_graph(str,k):
@@ -45,23 +49,25 @@ def test(reads, k):
     index = 0
     for a in reads:
         current = None
+        paired = None
 
         # We want to remove this element so we aren't comparing it against itself
         reads.pop(index)
 
         for b in reads:
-            overlap_amt = overlap(a,b, min_length = 6)
+            overlap_amt = overlap(a,b, min_length = 1)
             if current == None or current < overlap_amt:
                 current = overlap_amt
-
+                paired = b
             # We now have the highest overlap for a read
             read_dict[a] = b
 
         reads.insert(index,a)
-        index += 1
 
-    for key, value in read_dict.items():
-        list.append([key,value])
+        # found the best match
+        list.append([a,paired])
+        index += 1
+        current = None
 
     return list
 
@@ -169,10 +175,18 @@ def create_numbered_dict(edges, lookup):
 def print_circuit(circuit):
     return "d"
 
-seqrec = []
-with open(sys.argv[1]) as in_handle:
-    for title, seq, qual in FastqGeneralIterator(in_handle):
-        seqrec.append(seq)
 
-edges = test(seqrec,3)
-print(len(edges), len(seqrec))
+good_data = (rec for rec in SeqIO.parse(sys.argv[1],"fastq")
+            if min(rec.letter_annotations["phred_quality"]) >= 20)
+
+seqrec = []
+for x in good_data:
+    seqrec.append(str(x.seq))
+
+edges = test(seqrec, 3)
+print(edges)
+
+drawDeb(edges)
+#edges = test(seqrec,3)
+
+#print(len(edges), len(seqrec))
