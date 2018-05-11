@@ -69,9 +69,3 @@ sequence1 = "this_is_my_test_sentence_for_graphing"
 sequence2 = "this_branches_from_previous_sequence!"
 nodes, edges = graph.create_graph(None, None, sequence1, 6)
 nodes, edges = graph.create_graph(nodes, edges, sequence2, 6)
-
-
-
-#edges = test(seqrec,3)
-
-#print(len(edges), len(seqrec))
