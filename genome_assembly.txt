@@ -1,0 +1,4 @@
+MIT Genome Assembly:
+https://www.youtube.com/watch?v=ZYW2AeDE6wU
+  -> mentions some algorithm for finding overlap [before 15:00 after 12:00]
+        -> Simpson's algorithm

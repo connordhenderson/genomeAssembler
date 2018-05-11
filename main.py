@@ -1,20 +1,35 @@
 import sys
 import time
 from Bio import SeqIO
-from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGIter
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
-
-
-
-if (len(sys.argv) < 3):
-    print("Wrong args")
-    sys.exit()
 fpath = sys.argv[1]
-pqual = sys.argv[2]
 
-# we want to trim the data of anything that falls below our PHRED quality
-qc_data = (rec for rec in SeqIO.parse(fpath,"fastq")
-            if min(rec.letter_annotations["phred_quality"]))
+# Get PHRED score
+pqual = 20
+if (len(sys.argv) >= 3):
+    pqual = sys.argv[2]
 
-for rec in qc_data:
-    print(rec.seq)
+
+seqrec = []
+
+# Filter our data by a given PHRED score
+start = time.time()
+
+count = 0
+h = []
+with open(fpath) as handle:
+    for title, seq, qual in FastqGeneralIterator(handle):
+        count += 1
+        if (min([ord(i) for i in qual]) <= 20):
+            h.append(seq)
+
+print ("records: %i   -> elapsed: %f" % (count, (time.time() - start)))
+
+"""
+records = (rec for rec in SeqIO.parse(open(fpath),"fastq")
+            if min(rec.letter_annotations["phred_quality"]) <= pqual)
+
+handle = open("Data/trimmed1.fastq", "w")
+count = SeqIO.write(records, handle, "fastq")
+"""

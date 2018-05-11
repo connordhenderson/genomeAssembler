@@ -1,0 +1,9 @@
+.fastq
+.fasta
+.fq
+
+AfterQC
+Data
+Old
+Libraries
+__pycache__
