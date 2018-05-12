@@ -11,6 +11,8 @@ def draw(graph):
 
     values = [val_map.get(node, 1.25) for node in G.nodes()]
 
+    red_edges = []
+
     # Specify the edges you want here
     edge_colours = ['black' if not edge in red_edges else 'red'
                     for edge in G.edges()]
@@ -22,6 +24,6 @@ def draw(graph):
     plt.figure(1, figsize=(11,6.5))
     nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'),
                            node_color = values, node_size = 25)
-    #nx.draw_networkx_labels(G, pos, font_size=6)
     nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=True)
+    nx.draw_networkx_labels(G, pos, font_color = 'black', font_size = 12)
     plt.show()

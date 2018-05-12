@@ -46,12 +46,19 @@ class graph:
             path, node, unexplore = search.pop()
             path += [node]
 
-            if not unexplore:
+            if len(unexplore) < 1:
                 return path
 
             for edge in unexplore:
                 if node in edge:
                     search += [[path, self.next_node(edge, node), self.remove_edge(unexplore,edge)]]
+
+    def concat_euler(self):
+        path = self.get_eulerian()
+        s = ''.join(path[0][:-1])
+        for e in path:
+            s += e[-1]
+        return s
 
 
 

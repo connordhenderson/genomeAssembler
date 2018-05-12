@@ -64,10 +64,17 @@ def create_numbered_dict(edges, lookup):
             d[lookup[e[0]]] = lookup[e[1]]
     return d
 
-sequence = "this_is_my_test_sentence_for_graphing_this_branch"
+sequence1 = "this_is_my_test"
+sequence2 = "my_test_continued"
+sequence3 = "inued_sequence_generation"
+
 g = graph.graph();
-g.create_graph(sequence,8)
-print("euler: %s" % g.get_eulerian())
+g.create_graph(sequence1,4)
+g.update_graph(sequence2,4)
+g.update_graph(sequence3,4)
+
+print(g.concat_euler())
 
 import draw
 draw.draw(g)
+print(g.edges)
