@@ -53,7 +53,6 @@ def number_vertices(edges):
     return v, r
 
 def create_numbered_dict(edges, lookup):
-
     d = dict()
     for e in edges:
         if (lookup[e[0]] in d):
@@ -65,7 +64,10 @@ def create_numbered_dict(edges, lookup):
             d[lookup[e[0]]] = lookup[e[1]]
     return d
 
-sequence1 = "this_is_my_test_sentence_for_graphing"
-sequence2 = "this_branches_from_previous_sequence!"
-nodes, edges = graph.create_graph(None, None, sequence1, 6)
-nodes, edges = graph.create_graph(nodes, edges, sequence2, 6)
+sequence = "this_is_my_test_sentence_for_graphing_this_branch"
+g = graph.graph();
+g.create_graph(sequence,8)
+print("euler: %s" % g.get_eulerian())
+
+import draw
+draw.draw(g)

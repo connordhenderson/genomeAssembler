@@ -1,25 +1,59 @@
+class edge:
+    def __init__(self,start,end):
+        self.start = start
+        self.end = end
+        self.visited = False
+
 # Given a string 'str' and a size of a k-mer 'k', this will construct the set of nodes/edges for a De Bruijn graph
-def create_graph(nodes, edges, str,k):
-    # If we're not appending to a graph, these will be empty
-    if edges == None:
-        edges = []
-    if nodes == None:
-        nodes = set()
+class graph:
+    def __init__(self):
+        self.edges = None
+        self.nodes = None
 
-    for i in range(len(str) - k + 1):
-        # Creating left/right k-mers
-        edges.append([str[i:i+k-1], str[i+1:i+k]])
-        nodes.add(str[i:i+k-1])
-        nodes.add(str[i+1:i+k])
-    return nodes, edges
+    def create_graph(self, str,k):
+        # If we're not appending to a graph, these will be empty
+        if self.edges == None:
+            self.edges = []
+        if self.nodes == None:
+            self.nodes = set()
 
-def update_graph(nodes, edges, str, k):
         for i in range(len(str) - k + 1):
             # Creating left/right k-mers
-            edges.append([str[i:i+k-1], str[i+1:i+k]])
-            nodes.add(str[i:i+k-1])
-            nodes.add(str[i+1:i+k])
-        return nodes, edges
+            self.edges.append([str[i:i+k-1], str[i+1:i+k]])
+            self.nodes.add(str[i:i+k-1])
+            self.nodes.add(str[i+1:i+k])
+        return self.nodes, self.edges
+
+    def update_graph(self, str, k):
+            for i in range(len(str) - k + 1):
+                # Creating left/right k-mers
+                self.edges.append([str[i:i+k-1], str[i+1:i+k]])
+                self.nodes.add(str[i:i+k-1])
+                self.nodes.add(str[i+1:i+k])
+            return self.nodes, self.edges
+
+    # We're going to attempt to implement Hierholzer's algorithm
+    def next_node(self, edge, current):
+        return edge[0] if current == edge[1] else edge[1]
+
+    def remove_edge(self, raw_list, discard):
+        return [item for item in raw_list if item != discard]
+
+    def get_eulerian(self):
+        graph = self.edges
+        search = [[[], graph[0][0], graph]]
+        while search:
+            path, node, unexplore = search.pop()
+            path += [node]
+
+            if not unexplore:
+                return path
+
+            for edge in unexplore:
+                if node in edge:
+                    search += [[path, self.next_node(edge, node), self.remove_edge(unexplore,edge)]]
+
+
 
 
 # We need to be able to create a dictionary that will store information
@@ -34,43 +68,3 @@ def create_dict(edges):
         else:
             d[e[0]] = [e[1]]
     return d
-
-# We're going to attempt to implement Hierholzer's algorithm
-def get_eulerian(edges):
-    end = False
-
-    d = create_dict(edges)
-
-    # we need to create a dictionary of our edges
-    for e in edges:
-        d[e[0]] = e[1]
-
-    v = list(d)[0]
-    stack = [v]
-    circuit = []
-
-    current = 0
-    next = 0
-
-    # count the amount of edges on each vertex
-    e_count = dict()
-    for vx in range(len(list(d))):
-        e_count[vx] = len(d[vx])
-
-    while len(c_path) >= 0:
-        # if we have an exit edge, carry on
-        if len(d[vx]) > 0:
-            stack.append(current)
-
-            next = d[current][0]
-            # remove that edge
-            arr = d[current]
-            arr = arr[1:]
-            d[current] = arr
-
-            current = next
-        else:
-            circuit.append(current)
-            current = stack[-1]
-            stack.pop()
-    return circuit
