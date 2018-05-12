@@ -68,13 +68,12 @@ sequence1 = "this_is_my_test"
 sequence2 = "my_test_continued"
 sequence3 = "inued_sequence_generation"
 
-g = graph.graph();
-g.create_graph(sequence1,4)
-g.update_graph(sequence2,4)
-g.update_graph(sequence3,4)
+g = graph.graph(4);
+g.create_graph(sequence1)
+g.update_graph(sequence2)
+g.update_graph(sequence3)
 
-print(g.concat_euler())
+print(g.get_euler(g.edges))
 
-import draw
-draw.draw(g)
+
 print(g.edges)
