@@ -1,167 +1,238 @@
-class edge:
-    def __init__(self,start,end):
-        self.start = start
-        self.end = end
-        self.visited = False
+import kmer
 
-# Given a string 'str' and a size of a k-mer 'k', this will construct the set of nodes/edges for a De Bruijn graph
 class graph:
-    def __init__(self, kmer):
-        self.edges = None
-        self.nodes = None
-        self.kmer = kmer
-        self.start_node = None
-        self.end_node = None
+    def __init__(self, kmers, k=8):
+        vlist = nodes_from_kmers(kmers,k)
 
-    def create_graph(self, str):
-        # If we're not appending to a graph, these will be empty
-        k = self.kmer
+        self.k = k
+        self.edges = []
+        self.edge_labels = []
+        self.indices = {v:i for i,v in enumerate(vlist)}
+        self.vertices = {i:v for i,v in enumerate(vlist)}
 
-        if self.edges == None:
-            self.edges = []
-        if self.nodes == None:
-            self.nodes = set()
-
-        for i in range(len(str) - k + 1):
-            lkmer = str[i:i+k-1]
-            rkmer = str[i+1:i+k]
-            # Store the starting node
-            if self.start_node == None:
-                self.start_node = lkmer
-                self.end_node = rkmer
-            else:
-                # update our start/end nodes
-                if rkmer == self.start_node:
-                    self.start_node = lkmer
-                if lkmer == self.end_node:
-                    self.end_node = rkmer
-            # Creating left/right k-mers
-            self.edges.append([str[i:i+k-1], str[i+1:i+k]])
-            self.nodes.add(str[i:i+k-1])
-            self.nodes.add(str[i+1:i+k])
-
-        self.edges.append([self.end_node, self.start_node])
+        self.create_edges(kmers)
 
 
-        return self.nodes, self.edges
+    def update_graph(self, seq):
+        k = self.k
+        kmers = kmer.kmer_from_string(seq, k)
+        vlist = nodes_from_kmers(kmers,k)
+        ilen = len(self.indices)
+        for i,v in enumerate(vlist):
+            self.indices[v] = i + ilen -1
+            self.vertices[i + ilen - 1] = v
 
-    def update_graph(self, str):
-        k = self.kmer
-        for i in range(len(str) - k + 1):
-            # Creating left/right k-mers
-            self.edges.append([str[i:i+k-1], str[i+1:i+k]])
-            self.nodes.add(str[i:i+k-1])
-            self.nodes.add(str[i+1:i+k])
-        return self.nodes, self.edges
+        self.create_edges(kmers)
 
-    # We're going to attempt to implement Hierholzer's algorithm
-    def next_node(self, edge, current):
-        return edge[0] if current == edge[1] else edge[1]
+    """ Add a vertex by name (label) to the graph"""
+    def add_vertex(self, label):
+        i = len(self.indices)
+        self.indices[label] = i
+        self.vertices[i] = label
 
-    def remove_edge(self, raw_list, discard):
-        return [item for item in raw_list if item != discard]
+    """ Creates a directed edge between specified vertices"""
+    def add_edge(self, vsrc, vdst, label='', repeats=True):
+        e = (self.indices[vsrc], self.indices[vdst])
+        if (repeats) or (e not in self.edges):
+            self.edges.append(e)
+            self.edge_labels.append(label)
 
-    def get_euler(self, graph):
-        edges = graph
-        graph = {}
-        degree = {}
-        start = edges[0][0]
-        count_e = 0
-        for e in edges:
-            if not e[0] in graph:
-                graph[e[0]] = {}
-            if not e[0] in degree:
-                degree[e[0]] = 0
-            if not e[1] in graph:
-                graph[e[1]] = {}
-            if not e[1] in degree:
-                degree[e[1]] = 0
-            graph[e[0]][e[1]] = 1
-            graph[e[1]][e[0]] = 1
-            degree[e[0]] += 1
-            degree[e[1]] += 1
-            count_e += 1
-        max_d = 0
-        this_ = 0
-        for v, d in degree.items():
-            if not d%2 == 0 and d > 1:
-                # Eulerian tour not possible as odd degree found!
-                return False
-            if d>max_d:
-                this_ = v
-                max_d = d
-        visited_e = {}
-        def is_visited(i, j):
-            key = str(sorted([i,j]))
-            if key in visited_e:
-                return True
-            else:
-                visited_e[key] = True
-                return False
-        start = this_
-        route = [start]
-        indexof = {}
-        indexof[start] = 0
-        while count_e>0:
-            flag = False
-            for to_v in graph[this_]:
-                if not is_visited(to_v, this_):
-                    route.append([to_v])
-                    indexof[to_v] = len(route)-1
-                    degree[to_v] -= 1
-                    if degree[to_v] == 0:
-                        del degree[to_v]
-                    degree[this_] -= 1
-                    if degree[this_] == 0:
-                        del degree[this_]
-                    this_ = to_v
-                    flag = True
-                    count_e -= 1
+    def create_edges(self, kmers):
+        for i in kmers:
+            self.add_edge(i[:self.k-1], i[1:self.k], i)
+
+
+
+    """
+    Gets the in/out degree of the nodes in the graph
+    """
+    def get_degrees(self):
+        in_degree = {}
+        out_degree = {}
+
+        for src,dst in self.edges:
+            out_degree[src] = out_degree.get(src, 0) + 1
+            in_degree[dst] = in_degree.get(dst, 0) + 1
+
+        return in_degree, out_degree
+
+    def get_edges(self):
+        return self.edges
+
+    """
+    Returns the Eulerian path (if one was found, False otherwise) as a list of
+    edge ID's. Implemented using University of North Carolina's computational
+    systems biology method
+    """
+    def get_eulerian_path(self):
+        g = [(src,dst) for src,dst in self.edges]
+        c_vertex = self.get_start()
+        path = [c_vertex]
+        # "next" is where vertices get inserted into our tour
+        # it starts at the end (i.e. it is the same as appending),
+        # but later "side-trips" will insert in the middle
+        next = 1
+        while len(g) > 0:
+            for edge in g:
+                if (edge[0] == c_vertex):
+
+                    c_vertex = edge[1]
+                    g.remove(edge)
+                    path.insert(next, c_vertex)
+                    next += 1
                     break
-            if not flag:
-                break
-        for key, v in degree.items():
-            if v <=0:
-                continue
-            try:
-                ind = indexof[key]
-            except Exception as e:
-                continue
-            this_ = key
-            while count_e>0:
-                flag = False
-                for to_v in graph[this_]:
-                    if not is_visited(to_v, this_):
-                        route[ind].append(to_v)
-                        degree[to_v] -= 1
-                        degree[this_] -= 1
-                        this_ = to_v
-                        flag = True
-                        count_e -= 1
+            else:
+                for edge in g:
+                    try:
+                        next = path.index(edge[0]) + 1
+                        c_vertex = edge[0]
                         break
-                if not flag:
-                    break
-        route_ref = []
-        for r in route:
-            if type(r) == list:
-                for _r in r:
-                    route_ref.append(_r)
-            else:
-                route_ref.append(r)
-        return route_ref
+                    except ValueError:
+                        continue
+                else:
+                    print ("There is no path!")
+                    return False
+        return path
 
-    def concat_euler(self):
-        print (self.get_euler())
+    """
+    Given a list of edge IDs, this will return the corresponding list of edges.
+    Implemented using the University of North Carolina's computational systems
+    biology method
+    """
+    def get_eulerian_edges(self, path):
+        edge_id = {}
+        for i in range(len(self.edges)):
+            edge_id[self.edges[i]] = edge_id.get(self.edges[i], []) + [i]
+        edge_list = []
+        for i in range(len(path) - 1):
+            edge_list.append(self.edge_labels[edge_id[path[i],path[i+1]].pop()])
+        return edge_list
 
-# We need to be able to create a dictionary that will store information
-def create_dict(edges):
-    d = dict()
-    for e in edges:
-        if (e[0] in d):
-            arr = []
-            arr.append(d[e[0]])
-            arr.append(e[1])
-            d[e[0]] = arr
+    def test(self, path):
+        l = []
+        for e in path:
+            l.append(self.edge_labels[e])
+        return l
+
+    def get_nodes(self):
+        return self.vertices
+
+    """
+    Returns the starting node in the graph by comparing the amount of in/out
+    degrees within the graph. This method will likely become unreliable as we
+    start to get read errors, and should be reevaluated as a source of error
+    """
+    def get_start(self):
+        in_degree, out_degree = self.get_degrees()
+        start = 0
+        end = 0
+
+        for vert in self.vertices.keys():
+            ins = in_degree.get(vert, 0)
+            outs = out_degree.get(vert, 0)
+            if (ins == outs):
+                continue
+            elif (ins - outs) == 1:
+                end = vert
+            elif (outs - ins) == 1:
+                start = vert
+        if (start >= 0) and (end >= 0):
+            return start
         else:
-            d[e[0]] = [e[1]]
-    return d
+            return -1
+
+    def get_vertices(self):
+        return self.vertices
+
+    """
+    Returns the graph as a string that is readable by GraphViz for visualizing and
+    identifying sources of error for smaller graphs. Larger graphs can be created,
+    but attempting to graph them will result in the graphing application to crash
+    """
+    def render(self, highlightPath = []):
+        edge_id = {}
+        for i in range(len(self.edges)):
+            edge_id[self.edges[i]] = edge_id.get(self.edges[i], []) + [i]
+        edge_set = set()
+
+        for i in range(len(highlightPath) - 1):
+            src = self.indices[highlightPath[i]]
+            dst = self.indices[highlightPath[i+1]]
+            edge_set.add(edge_id[src,dst].pop())
+        result = ''
+        result += 'digraph {\n'
+        result += '   graph [nodesep=2, size="300,300"];\n'
+
+        for index, label in self.vertices.items():
+            result += '    N%d [shape="box", style="rounded", label="%s"];\n' % (index, label)
+        for i, e in enumerate(self.edges):
+            src, dst = e
+            result += '    N%d -> N%d' % (src, dst)
+            label = self.edge_labels[i]
+            if (len(label) > 0):
+                if (i in edge_set):
+                    result += ' [label="%s", penwidth=3.0]' % (label)
+                else:
+                    result += ' [label="%s"]' % (label)
+            elif (i in edge_set):
+                result += ' [penwidth=3.0]'
+            result += ';\n'
+        result += '    overlap=false;\n'
+        result += '}\n'
+        return result
+
+    """
+    Gets the GraphViz readable string and saves it to a file labeled
+    'output.txt'
+    """
+    def save_graph(self):
+        file = open("output.txt","w")
+        file.write(self.render())
+        file.close()
+
+    """
+    A shortcut helper function that will get the Eulerian path and display it.
+    Used when you don't need to explicitly print the edges/path (like debugging)
+    """
+    def print_euler(self):
+        path = self.get_eulerian_path()
+        path = self.get_eulerian_edges(path)
+        seq = path[0][0:self.k]
+        for kmer in path[1:]:
+            seq += kmer[self.k-1]
+        print (seq)
+
+    """
+    Gets the Eulerian tour and saves its sequence to a file, returns the sequence
+    """
+    def save_euler(self, fpath="Data/output.dat"):
+        """Get the Eulerian tour, and concat the last letter of each node
+        to give us the resulting sequence"""
+        path = self.get_eulerian_path()
+        path = self.get_eulerian_edges(path)
+        seq = path[0][0:self.k]
+
+        for kmer in path[1:]:
+            seq += kmer[self.k-1]
+
+        with open(fpath, 'w') as file:
+            file.write(seq)
+
+        return seq
+
+"""
+Used to construct the graph; ultimately redundant when you can just use the
+constructor, but is a hold-over from previous methods that sees testing use
+"""
+def create_graph(kmers, k):
+    g = None
+    g = graph(kmers, k)
+    print("[DONE]   ->  graph created")
+    return g
+
+
+"""
+Creates a list of nodes from a list of k-mers
+"""
+def nodes_from_kmers(kmers, k):
+    return sorted(set([i[:k-1] for i in kmers] + [i[1:k] for i in kmers]))

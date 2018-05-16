@@ -1,79 +1,90 @@
-import sys, time
-import utility as util
-import graph, gnode
-import itertools
-import time
+import os, sys, random, ast
+import kmer, quality_control, graph, utility
 
-from Bio.SeqIO.QualityIO import FastqGeneralIterator
-from Bio import SeqIO
+def clean_sample(path):
+    lines = []
+    with open(path) as file:
+        count = 0
+        try:
+            while 1:
+                count += 1
+                line = next(file).strip()
+                if count == 2:
+                    lines.append(line)
+                if count == 4:
+                    count = 0
+        except StopIteration:
+            print("done")
+        file.close()
 
-from collections import defaultdict
+    with open("Data/sequences.dat", 'w') as file:
+        for line in lines:
+            file.write("%s\n"%line)
+def lorem_ipsum():
+    seq = ''
+    with open("Data/loremipsum.dat") as file:
+        try:
+            while 1:
+                line = next(file)
+                line = line.strip().split(" ")
+                seq += "".join(line)
+        except StopIteration:
+            print("done parsing lorem ipsum")
+            file.close()
 
-# Finds the strings with the highest overlap values, and returns those values
-def pick_maximal_overlap(reads, k):
-    reada, readb = None, None
-    best_overlap_len = 0
-    for a,b in itertools.permutations(reads, 2):
-        overlap_len = overlap(a,b,min_length = k)
-        if overlap_len > best_overlap_len:
-            reada, readb = a,b
-            best_overlap_len = overlap_len
-    return reada, readb, best_overlap_len
-
-# Uses the maximal overlaps to always combine the highest overlap values in order; not exhaustive but not always right.
-# This means we can get stuck in a cycle and need to find a way to break out of the cycle
-def greedy_shortest_common_superstring(reads, k):
-    reada, readb, overlap_len = pick_maximal_overlap(reads, k)
-    while overlap_len > 0:
-        reads.remove(reada)
-        reads.remove(readb)
-        reads.append(reada + readb[overlap_len:])
-        reada, readb, overlap_len = pick_maximal_overlap(reads, k)
-
-    return ''.join(reads)
-
-
-
-# This allows us to have duplicate keys since they're all assigned via ID
-def number_vertices(edges):
-    v = dict()
-
-    curr_num = 0;
-    for e in edges:
-        if (e[0] not in v):
-            v[e[0]] = curr_num
-            curr_num += 1
-
-    # We actually want to reverse the order of the dict for looking up, and
-    # eliminating duplicates
-    r = dict()
-    for n in list(v):
-        r[v[n]] = n
-
-    return v, r
-
-def create_numbered_dict(edges, lookup):
-    d = dict()
-    for e in edges:
-        if (lookup[e[0]] in d):
-            arr = []
-            arr.append(d[lookup[e[0]]])
-            arr.append(lookup[e[1]])
-            d[lookup[e[0]]] = arr
-        else:
-            d[lookup[e[0]]] = lookup[e[1]]
-    return d
-
-sequence1 = "this_is_my_test"
-sequence2 = "my_test_continued"
-sequence3 = "inued_sequence_generation"
-
-g = graph.graph(4);
-g.create_graph(sequence1)
-g.update_graph(sequence2)
-g.update_graph(sequence3)
-
-print(g.get_euler(g.edges))
+    with open("Data/sequences.dat", 'w') as file:
+        file.write("%s\n"%seq)
+        file.close()
 
 
-print(g.edges)
+def random_sequence(seq_length, read_length, read_amt, path=None):
+    seq_list = []
+
+    chars = ["A","T","G","C"]
+    seq = ''
+
+    if path == None:
+        for i in range(seq_length):
+            seq += random.choice(chars)
+    else:
+        count = 0
+        with open(path) as file:
+            try:
+                while 1:
+                    line = next(file)
+                    count += 1
+                    seq = line
+            except StopIteration:
+                print("scanned file; %i lines"%count)
+                print("seq length: %i"%len(seq))
+
+    while read_amt > 0:
+        index = random.randint(0,seq_length)
+        if (seq_length > index+read_length):
+            s = seq[index:index+read_length]
+            seq_list.append(s)
+            read_amt -= 1
+    with open("Data/sequences.dat", 'w') as file:
+        for line in seq_list:
+            file.write("%s\n"%line)
+    print("[DONE]   ->  sequence created & saved")
+    return seq
+
+k = 10
+path = None
+test_data = None
+for arg in sys.argv:
+    if arg.startswith("k="):
+        k = int(arg[2:])
+    if arg.startswith("f="):
+        path = str(arg[2:])
+    if arg.startswith("d="):
+        test_data = ast.literal_eval(arg[2:])
+    if arg.startswith("l="):
+        if arg[2:] == "True":
+            seq = lorem_ipsum()
+            sys.exit()
+
+if (test_data != None) and len(test_data) > 2:
+    print ("[TEST]  ->  random_sequence(",test_data,")")
+    seq = random_sequence(test_data[0], test_data[1], test_data[2], path)

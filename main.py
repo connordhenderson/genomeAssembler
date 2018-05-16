@@ -1,35 +1,55 @@
 import sys
-import time
-from Bio import SeqIO
-from Bio.SeqIO.QualityIO import FastqGeneralIterator
+import utility, kmer, graph, quality_control
 
-fpath = sys.argv[1]
-
-# Get PHRED score
-pqual = 20
-if (len(sys.argv) >= 3):
-    pqual = sys.argv[2]
-
-
-seqrec = []
-
-# Filter our data by a given PHRED score
-start = time.time()
-
-count = 0
-h = []
-with open(fpath) as handle:
-    for title, seq, qual in FastqGeneralIterator(handle):
-        count += 1
-        if (min([ord(i) for i in qual]) <= 20):
-            h.append(seq)
-
-print ("records: %i   -> elapsed: %f" % (count, (time.time() - start)))
+k = 20
+path = ""
+clean = True
+test = False
 
 """
-records = (rec for rec in SeqIO.parse(open(fpath),"fastq")
-            if min(rec.letter_annotations["phred_quality"]) <= pqual)
-
-handle = open("Data/trimmed1.fastq", "w")
-count = SeqIO.write(records, handle, "fastq")
+Attempt to get the proper arguments; kmer size, file path
 """
+for arg in sys.argv:
+    if arg.startswith("k="):
+        k = int(arg[2:])
+    if arg.startswith("f="):
+        path = str(arg[2:])
+    if arg.startswith("c="):
+        clean = arg[2:]
+    if arg.startswith("t="):
+        test = arg[2:]
+
+"""
+Clean the data
+"""
+if clean == True:
+    quality_control.clean_data(path)
+    print("[DONE]   ->  data trimmed")
+else:
+    print("[SKIP]   ->  data cleaning skipped")
+
+"""
+Create the k-mers
+"""
+kmer.clear_kmers("Data/kmers.dat")
+kmers = kmer.create_kmers(k)
+print("# of kmers: %i" % len(kmers))
+sys.stdout.flush()      # Flush stdout so we can identify when we get stuck in
+                        # finding the Eulerian tour
+"""
+Create the graph from the k-mers
+"""
+g = graph.create_graph(kmers, k)
+g.save_graph()
+
+"""
+Save the Eulerian path (equivalent to the sequenced genome); print it
+"""
+seq = g.save_euler()
+print("eulerian sequence length: %i" % len(seq))
+
+"""
+Play an audio cue so that we know the sequencing has completed; useful for long
+runs when we are testing inefficient methods
+"""
+utility.play()
