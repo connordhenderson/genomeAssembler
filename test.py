@@ -1,5 +1,5 @@
-import os, sys, random, ast
-import kmer, quality_control, graph, utility
+import os, sys, random, ast, time
+import kmer, quality_control, graph, utility, main, gv
 
 def clean_sample(path):
     lines = []
@@ -20,13 +20,14 @@ def clean_sample(path):
     with open("Data/sequences.dat", 'w') as file:
         for line in lines:
             file.write("%s\n"%line)
+
 def lorem_ipsum():
     seq = ''
     with open("Data/loremipsum.dat") as file:
         try:
             while 1:
                 line = next(file)
-                line = line.strip().split(" ")
+                line = "".join(line.splitlines())
                 seq += "".join(line)
         except StopIteration:
             print("done parsing lorem ipsum")
@@ -53,10 +54,11 @@ def random_sequence(seq_length, read_length, read_amt, path=None):
                 while 1:
                     line = next(file)
                     count += 1
-                    seq = line
+                    seq += line
             except StopIteration:
-                print("scanned file; %i lines"%count)
-                print("seq length: %i"%len(seq))
+                seq_length = len(seq)
+                print("scanned %s; %i lines"%(path,count))
+                print("seq length: %i"%(seq_length))
 
     while read_amt > 0:
         index = random.randint(0,seq_length)
@@ -70,6 +72,9 @@ def random_sequence(seq_length, read_length, read_amt, path=None):
     print("[DONE]   ->  sequence created & saved")
     return seq
 
+print("Starting!")
+sys.stdout.flush()
+
 k = 10
 path = None
 test_data = None
@@ -81,8 +86,22 @@ for arg in sys.argv:
     if arg.startswith("d="):
         test_data = ast.literal_eval(arg[2:])
     if arg.startswith("l="):
-        if arg[2:] == "True":
+        if arg[2:] == "create":
             seq = lorem_ipsum()
+            sys.exit()
+        if arg[2:] == "full":
+            seq = lorem_ipsum()
+            seq = random_sequence(test_data[0], test_data[1], test_data[2], path)
+            main.start(True)
+            utility.play()
+            sys.exit()
+        if arg[2:] == "gbff":
+            start = time.time()
+            seq = random_sequence(test_data[0], test_data[1], test_data[2], path)
+            main.start(True)
+            utility.play()
+            print("[DONE]   ->  Elapsed time: %ss" % str(time.time() - start))
+
             sys.exit()
 
 if (test_data != None) and len(test_data) > 2:

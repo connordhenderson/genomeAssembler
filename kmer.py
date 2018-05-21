@@ -10,6 +10,7 @@ def create_kmers(k, inpath="Data/sequences.dat"):
                     new_kmers = kmer_from_string(line, k)
                     for kmer in new_kmers:
                         old_kmers.add(kmer)
+
         except StopIteration:
             print("[DONE]   ->  kmers created")
     return sorted(list(old_kmers))

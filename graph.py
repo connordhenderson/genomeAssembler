@@ -1,7 +1,25 @@
 import kmer
 
+class vertex:
+    def __init__(self, label, index):
+        self.index = index
+        self.label = label
+        self.outs = []
+
+class edge:
+    def __init__(self, l, r):
+        self.left = l
+        self.right = r
+        self.label = ""
+
 class graph:
-    def __init__(self, kmers, k=8):
+    def __init__(self, kmers, k=9):
+        """
+        'k' should always be odd so that we don't return a compliment that
+        is identical
+        """
+        if (k%2==0):
+            k +=1
         vlist = nodes_from_kmers(kmers,k)
 
         self.k = k
@@ -10,17 +28,8 @@ class graph:
         self.indices = {v:i for i,v in enumerate(vlist)}
         self.vertices = {i:v for i,v in enumerate(vlist)}
 
-        self.create_edges(kmers)
-
-
-    def update_graph(self, seq):
-        k = self.k
-        kmers = kmer.kmer_from_string(seq, k)
-        vlist = nodes_from_kmers(kmers,k)
-        ilen = len(self.indices)
-        for i,v in enumerate(vlist):
-            self.indices[v] = i + ilen -1
-            self.vertices[i + ilen - 1] = v
+        self.start = None
+        self.end = None
 
         self.create_edges(kmers)
 
@@ -40,8 +49,6 @@ class graph:
     def create_edges(self, kmers):
         for i in kmers:
             self.add_edge(i[:self.k-1], i[1:self.k], i)
-
-
 
     """
     Gets the in/out degree of the nodes in the graph
@@ -99,20 +106,17 @@ class graph:
     Implemented using the University of North Carolina's computational systems
     biology method
     """
-    def get_eulerian_edges(self, path):
+    def get_labels_from_edge(self, path):
         edge_id = {}
         for i in range(len(self.edges)):
             edge_id[self.edges[i]] = edge_id.get(self.edges[i], []) + [i]
         edge_list = []
         for i in range(len(path) - 1):
-            edge_list.append(self.edge_labels[edge_id[path[i],path[i+1]].pop()])
+            try:
+                edge_list.append(self.edge_labels[edge_id[path[i],path[i+1]].pop()])
+            except KeyError:
+                return edge_list
         return edge_list
-
-    def test(self, path):
-        l = []
-        for e in path:
-            l.append(self.edge_labels[e])
-        return l
 
     def get_nodes(self):
         return self.vertices
@@ -124,8 +128,8 @@ class graph:
     """
     def get_start(self):
         in_degree, out_degree = self.get_degrees()
-        start = 0
-        end = 0
+        start = -1
+        end = -1
 
         for vert in self.vertices.keys():
             ins = in_degree.get(vert, 0)
@@ -136,7 +140,10 @@ class graph:
                 end = vert
             elif (outs - ins) == 1:
                 start = vert
+
         if (start >= 0) and (end >= 0):
+            self.end = end
+            self.start = start
             return start
         else:
             return -1
@@ -186,9 +193,10 @@ class graph:
     'output.txt'
     """
     def save_graph(self):
-        file = open("output.txt","w")
+        file = open("output.gv","w")
         file.write(self.render())
         file.close()
+        print("[DONE] Saved Graph")
 
     """
     A shortcut helper function that will get the Eulerian path and display it.
@@ -196,7 +204,7 @@ class graph:
     """
     def print_euler(self):
         path = self.get_eulerian_path()
-        path = self.get_eulerian_edges(path)
+        path = self.get_labels_from_edge(path)
         seq = path[0][0:self.k]
         for kmer in path[1:]:
             seq += kmer[self.k-1]
@@ -209,7 +217,12 @@ class graph:
         """Get the Eulerian tour, and concat the last letter of each node
         to give us the resulting sequence"""
         path = self.get_eulerian_path()
-        path = self.get_eulerian_edges(path)
+        if (path == False):
+            return False
+        else:
+            print("Eulerian Path Found")
+
+        path = self.get_labels_from_edge(path)
         seq = path[0][0:self.k]
 
         for kmer in path[1:]:
