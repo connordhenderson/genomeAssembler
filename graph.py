@@ -40,7 +40,7 @@ class graph:
         self.vertices[i] = label
 
     """ Creates a directed edge between specified vertices"""
-    def add_edge(self, vsrc, vdst, label='', repeats=True):
+    def add_edge(self, vsrc, vdst, label='', repeats=False):
         e = (self.indices[vsrc], self.indices[vdst])
         if (repeats) or (e not in self.edges):
             self.edges.append(e)
