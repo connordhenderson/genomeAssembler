@@ -15,26 +15,19 @@ def create_kmers(k, inpath="Data/sequences.dat"):
             print("[DONE]   ->  kmers created")
     return sorted(list(old_kmers))
 
+def reverse_compliment(seq):
+    seq = list(seq)
+    compliment = {'A':'T', 'T':'A', 'G':'C', 'C':'G'}
+    for i in range(len(seq)):
+        seq[i] = compliment[seq[i]]
+    return "".join(reversed(seq))
 
 
 def kmer_from_string(string, k):
     k = int(k)
     string = string.strip()
     kmers = sorted([string[i:i+k] for i in range(len(string) - k+1)])
-    """
-    # Originally used for allowing duplications; no longer necessary since we
-    # are relying on creating contigs first
-    for i in range(1,len(kmers)):
-        if kmers[i] == kmers[i-1][0:k]:
-            t = kmers[i-1].find('_')
-            if (t >= 0):
-                # TODO: Address the route of the ValueError
-                n = int(kmers[i-1][t+1:]) + 1
-                kmers[i] = kmers[i] + "_" + str(n)
-            else:
-                kmers[i-1] = kmers[i-1] + "_1"
-                kmers[i] = kmers[i] + "_2"
-    """
+
     return kmers
 
 def clear_kmers(path="Data/kmers.dat"):
