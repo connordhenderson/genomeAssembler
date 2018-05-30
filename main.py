@@ -1,6 +1,8 @@
-import sys
+import sys, time
 import utility, kmer, graph, quality_control
 def start(test):
+    start = time.time()
+
     k = 20
     path = ""
     clean = True
@@ -58,6 +60,7 @@ def start(test):
         print("eulerian sequence length: %i" % len(seq))
 
     sys.stdout.flush()
+    print("time elapsed: %f" % (time.time() - start))
 
 if sys.argv[0] == 'main.py':
     start()

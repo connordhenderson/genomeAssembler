@@ -72,6 +72,55 @@ def random_sequence(seq_length, read_length, read_amt, path=None):
     print("[DONE]   ->  sequence created & saved")
     return seq
 
+def create_paired_data(read_length, read_amt, gap_length, path):
+    total_length = 2*read_length + gap_length
+    seq = ''
+
+    l_read = []
+    r_read = []
+
+    # Store the sequence in memory
+    with open(path) as handle:
+        try:
+            while 1:
+                seq += next(file)
+        except StopIteration:
+            pass
+
+    seq_len = len(seq)
+
+    while read_amt > 0:
+        index = random.randint(0,len(seq))
+
+        if seq_len > index + read_length:
+            l_read.append(seq[index:index+read_length])
+        if seq_len > index + total_length:
+            new_index = index + gap_length + read_length
+            r_read.append(seq[new_index:new_index + read_length])
+        else:
+            r_read.append(seq[-read_length:])
+
+    with open("Data/left.dat", 'w') as file:
+        for line in l_read:
+            file.write("%s\n"%line)
+
+    with open("Data/right.dat", 'w') as file:
+        for line in r_read:
+            new_line = ''
+            for letter in reversed(line):
+                # Get the reverse compliment (to simulate paired read)
+                if letter == 'A':
+                    new_line += 'T'
+                if letter == 'T':
+                    new_line += 'A'
+                if letter == 'C':
+                    new_line += 'G'
+                if letter == 'G':
+                    new_line += 'C'
+
+            file.write("%s\n"%new_line)
+
+
 print("Starting!")
 sys.stdout.flush()
 
@@ -93,13 +142,13 @@ for arg in sys.argv:
             seq = lorem_ipsum()
             seq = random_sequence(test_data[0], test_data[1], test_data[2], path)
             main.start(True)
-            utility.play()
+            #utility.play()
             sys.exit()
         if arg[2:] == "gbff":
             start = time.time()
             seq = random_sequence(test_data[0], test_data[1], test_data[2], path)
             main.start(True)
-            utility.play()
+            #utility.play()
             print("[DONE]   ->  Elapsed time: %ss" % str(time.time() - start))
 
             sys.exit()

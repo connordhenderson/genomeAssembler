@@ -1,19 +1,68 @@
 import os, random
 
-def create_kmers(k, inpath="Data/sequences.dat"):
-    old_kmers = set()
-    with open(inpath) as handle:
-        try:
-            while 1:
-                line = next(handle)
-                if (line != "\n"):
-                    new_kmers = kmer_from_string(line, k)
-                    for kmer in new_kmers:
-                        old_kmers.add(kmer)
+class kmer:
+    def __init__(self, id, l, r=""):
+        self.id = [id]
+        self.seq = l + r
 
-        except StopIteration:
-            print("[DONE]   ->  kmers created")
+    def startswith(self, kmer):
+        return self.l.startswith(kmer.l)
+
+    def __getitem__(self, key):
+        return self.seq[key]
+
+    def __iter__(self):
+        return self.seq
+
+    def __eq__(self, s):
+        return self.seq == s
+
+    def __lt__(self, other):
+        return self.seq < other.seq
+
+    # We want to hash by the sequence for set membership, not comparing ID
+    def __hash__(self):
+        return hash(self.seq)
+
+def create_kmers(k, lpath="Data/sequences.dat", rpath = None):
+    old_kmers = dict()
+    id = 0
+    if rpath == None:
+        with open(lpath) as handle:
+            try:
+                while 1:
+                    line = next(handle)
+                    if (line != "\n"):
+                        new_kmers = kmer_from_string(line, id, k)
+                        for km in new_kmers:
+                            if km not in old_kmers:
+                                old_kmers[km] = kmer(id, km)
+                            else:
+                                old_kmers[km].id.append(id)
+                            id += 1
+            except StopIteration:
+                print("[DONE]   ->  kmers created")
+    else:
+        with open(lpath) as lhandle, open(rpath) as rhandle:
+            try:
+                while 1:
+                    lline = next(lhandle)
+                    rline = next(rhandle)
+
+                    if (lline != "\n" and rline != "\n"):
+                        new_kmers = paired_kmer_from_string(lline, rline, id, k)
+                        for km in new_kmers:
+                            if km not in old_kmers:
+                                old_kmers[km] = kmer(id, km)
+                            else:
+                                old_kmers[km].id.append(id)
+                            id += 1
+
+
+            except StopIteration:
+                print("[DONE]   ->  paired kmers created")
     return sorted(list(old_kmers))
+
 
 def reverse_compliment(seq):
     seq = list(seq)
@@ -23,12 +72,16 @@ def reverse_compliment(seq):
     return "".join(reversed(seq))
 
 
-def kmer_from_string(string, k):
-    k = int(k)
-    string = string.strip()
-    kmers = sorted([string[i:i+k] for i in range(len(string) - k+1)])
 
+
+def paired_kmer_from_string(lstring, rstring, id, k):
+    k = int(k)
+    lstring = lstring.rstrip('\n')
+    rstring = rstring.rstrip('\n')
+
+    kmers = sorted([lstring[i:i+k]+rstring[i:i+k] for i in range(len(lstring) - k+1)])
     return kmers
+
 
 def clear_kmers(path="Data/kmers.dat"):
     file = open(path, 'w')
