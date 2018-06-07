@@ -7,7 +7,7 @@ Illumina quality scores have an offset of 33 compared to their Phred score
 """
 def trim_quality(reads, pqual):
     for read in reads:
-        if record.letter_annotations["phred_quality"] >= pqual:
+        if min(record.letter_annotations["phred_quality"]) >= pqual:
             yield read
 
 """
@@ -38,7 +38,7 @@ def trim_adapters(reads, adapter):
 """
 Performs all of the various data trimming specified
 """
-def trim_data(reads, pqual=20, primer=None, adapter=None):
+def trim_data(reads, pqual=640, primer=None, adapter=None):
     pqual += 33
     reads = trim_quality(reads,pqual)
     if primer != None:
@@ -50,18 +50,54 @@ def trim_data(reads, pqual=20, primer=None, adapter=None):
 """
 Initiates the process to trim the data, then write it to a file
 """
-def clean_data(path):
+def clean_data(path, save):
     reads = SeqIO.parse(path,"fastq")
     reads = trim_data(reads)
 
-    print("[DONE]   ->  data cleaning generators created... saving sequences")
     seqlist = []
-    with open(path) as handle:
-        for title,seq,qual in FastqGeneralIterator(handle):
-            seqlist.append(seq)
 
-    path = "Data/sequences.dat"
+    good_reads = (rec for rec in \
+              SeqIO.parse(path, "fastq") \
+              if min(rec.letter_annotations["phred_quality"]) >= 20)
+    for rec in good_reads:
+        seqlist.append(rec.seq)
 
-    file = open(path, 'w')
+
+
+    file = open(save, 'w')
+    print("saving to '%s'"%save)
     for item in seqlist:
         file.write("%s\n" % item)
+
+"""
+Initiates the process to trim the data, then write it to a file
+"""
+def clean_paired_data(lpath, rpath, lsave, rsave):
+    pqual = 70
+
+    lseqlist = []
+    rseqlist = []
+    count = 0
+    with open(lpath) as lfile, open(rpath) as rfile:
+        liter = FastqGeneralIterator(lfile)
+        riter = FastqGeneralIterator(rfile)
+
+        while 1:
+            try:
+                lseq, lqual = next(liter)[1:]
+                rseq, rqual = next(liter)[1:]
+
+                if ord(min(lqual)) >= pqual and ord(min(rqual)) >= pqual:
+                    lseqlist.append(lseq)
+                    rseqlist.append(rseq)
+
+            except StopIteration:
+                print("EOF")
+                break
+
+    with open(lsave,'w') as lfile, open(rsave, 'w') as rfile:
+        print("saving to '%s' and '%s'"%(lsave,rsave))
+        for litem in lseqlist:
+            lfile.write("%s\n" % litem)
+        for ritem in rseqlist:
+            rfile.write("%s\n" % ritem)

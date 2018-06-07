@@ -1,8 +1,8 @@
-import os, random
+import os, random, sys
+from digraph import graph
 
 class kmer:
-    def __init__(self, id, l, r=""):
-        self.id = [id]
+    def __init__(self, l, r=""):
         self.seq = l + r
 
     def startswith(self, kmer):
@@ -24,9 +24,14 @@ class kmer:
     def __hash__(self):
         return hash(self.seq)
 
+    def __str__(self):
+        return self.seq
+
 def create_kmers(k, lpath="Data/sequences.dat", rpath = None):
-    old_kmers = dict()
+    old_kmers = []
     id = 0
+    print("DEPREC")
+    """
     if rpath == None:
         with open(lpath) as handle:
             try:
@@ -43,26 +48,52 @@ def create_kmers(k, lpath="Data/sequences.dat", rpath = None):
             except StopIteration:
                 print("[DONE]   ->  kmers created")
     else:
-        with open(lpath) as lhandle, open(rpath) as rhandle:
-            try:
-                while 1:
-                    lline = next(lhandle)
-                    rline = next(rhandle)
+    """
+    with open(lpath) as lhandle, open(rpath) as rhandle:
+        try:
+            while 1:
+                lline = next(lhandle)
+                rline = next(rhandle)
 
-                    if (lline != "\n" and rline != "\n"):
-                        new_kmers = paired_kmer_from_string(lline, rline, id, k)
-                        for km in new_kmers:
-                            if km not in old_kmers:
-                                old_kmers[km] = kmer(id, km)
-                            else:
-                                old_kmers[km].id.append(id)
-                            id += 1
-
-
-            except StopIteration:
-                print("[DONE]   ->  paired kmers created")
+                if (lline != "\n" and rline != "\n"):
+                    new_kmers = paired_kmer_from_string(lline, rline, id, k)
+                    for km in new_kmers:
+                        if km not in old_kmers:
+                            old_kmers.append(km)
+        except StopIteration:
+            print("[DONE]   ->  K-mers created")
     return sorted(list(old_kmers))
 
+def graph_from_sequences(graph, k, lpath="Data/sequences.dat", rpath = None):
+    old_kmers = dict()
+    """
+    if rpath == None:
+        with open(lpath) as handle:
+            try:
+                while 1:
+                    line = next(handle)
+                    if (line != "\n"):
+                        new_kmers = kmer_from_string(line, id, k)
+                        graph.add_kmers(new_kmers)
+            except StopIteration:
+                print("[DONE]   ->  kmers created")
+    else:
+    """
+    with open(lpath) as lhandle, open(rpath) as rhandle:
+        try:
+            print("[TASK]   ->  Creating k-mers")
+            sys.stdout.flush()
+
+            while 1:
+                lline = next(lhandle)
+                rline = reverse_compliment(next(rhandle).rstrip('\n'))
+
+                if (lline != "\n" and rline != "\n"):
+                    new_kmers = paired_kmer_from_string(lline, rline, k)
+                    graph.add_kmers(new_kmers)
+                    new_kmers = None
+        except StopIteration:
+            print("[DONE]   ->  Paired k-mers created")
 
 def reverse_compliment(seq):
     seq = list(seq)
@@ -71,17 +102,12 @@ def reverse_compliment(seq):
         seq[i] = compliment[seq[i]]
     return "".join(reversed(seq))
 
-
-
-
-def paired_kmer_from_string(lstring, rstring, id, k):
+def paired_kmer_from_string(lstring, rstring, k):
     k = int(k)
     lstring = lstring.rstrip('\n')
     rstring = rstring.rstrip('\n')
 
-    kmers = sorted([lstring[i:i+k]+rstring[i:i+k] for i in range(len(lstring) - k+1)])
-    return kmers
-
+    return [lstring[i:i+k]+rstring[i:i+k] for i in range(len(lstring) - k+1)]
 
 def clear_kmers(path="Data/kmers.dat"):
     file = open(path, 'w')
@@ -97,7 +123,6 @@ def list_to_file(path, kmers):
         file = open(path, 'r')
         contents = file.readlines()
         file.close()
-
 
     with open(path, 'w') as file:
         p_kmer = ''

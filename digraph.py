@@ -1,9 +1,9 @@
-import sys
+import sys, time
 import kmer
 from Bio.Blast import NCBIWWW
 
 """
-Creates an edge between two nodes in our graph
+This class is used to create an edge between two nodes in our graph
 The label of the edge is the k-mer, or the paired k-mers after they've been
 concatenated
 """
@@ -21,13 +21,12 @@ class edge:
         return label
 
 """
-Creates a node on the graph, representing either the prefix or suffix of the
-k-mer. For a set of paired k-mers, this is the prefix/suffix of both k-mers,
-concatenated for the label. Stores connecting edge information
+This class is used to create a node on the graph, representing either the prefix
+or suffix of the k-mer. For a set of paired k-mers, this is the prefix/suffix of
+both k-mers, concatenated for the label. Stores connecting edge information
 """
 class node:
-    def __init__(self, graph, index, label, paired=False):
-        self.graph = graph
+    def __init__(self, index, label, paired=False):
         self.label = label
         self.edges = []
         self.index = index
@@ -43,7 +42,7 @@ class node:
         return hash(self.label)
 
     def __str__(self):
-        return "%i[%s]" % (self.index, self.label)
+        return "%s[%s]" % (self.index, self.label)
 
     def get_degree(self):
         return self.in_degree - self.out_degree
@@ -54,30 +53,41 @@ whether or not this is a paired graph
 TODO: Verify unpaired graph creation is unaffected by implementation of pairs
 """
 class graph:
-    def __init__(self, k, kmers, paired=False):
+    def __init__(self, k, paired=False, kmers=None):
         self.k = k
         self.edges = dict()
         self.nodes = dict()
         self.indices = dict()
         self.contigs = dict()
+        self.count = 0
 
-        for i,v in enumerate(self.labels_from_kmers(k,kmers, paired)):
-            self.nodes[v] = node(self,i, v, paired)
-            self.indices[i] = v
+        self.paired = paired
 
-        print("[DONE]   ->  Edges created")
+        if kmers != None:
+            self.add_kmers(kmers,paired)
 
-        for i in kmers:
+            for i in kmers:
+                e = edge(i)
+                self.add_edge(e, paired)
+
+    def add_kmers(self, km):
+        for i,v in enumerate(self.labels_from_kmers(self.k, km)):
+            if (self.nodes.get(v) == None):
+                self.nodes[v] = node(self.count, v, self.paired)
+                self.indices[self.count] = v
+                self.count += 1
+
+        for i in km:
             e = edge(i)
-            self.add_edge(e, paired)
+            self.add_edge(e)
 
     """ Create an edge, then add it to the graph; where the passed edge
     is a kmer string """
-    def add_edge(self, edge, paired=False):
-        klen = len(kmers[0])
+    def add_edge(self, edge):
+        klen = self.k * 2
         hlen = int(klen/2)
 
-        if not paired:
+        if not self.paired:
             lindex = edge.label[:-1]
             rindex = edge.label[1:]
         else:
@@ -88,30 +98,32 @@ class graph:
         if edge.label not in self.edges.keys():
             self.edges[edge.label] = edge
             self.nodes[lindex].edges.append(edge)
+
+            self.nodes[rindex].in_degree += 1
+            self.nodes[lindex].out_degree += 1
         else:
             """ Currently unused; may be valid for determining low occurence
             rates for data cleaning """
             self.edges[edge.label].multiplicity += 1
 
-        self.nodes[rindex].in_degree += 1
-        self.nodes[lindex].out_degree += 1
+
 
     """ Creates a sorted set of labels from the kmers to be used for node
     creation """
-    def labels_from_kmers(self, k, kmers, paired=False):
-        if not paired:
-            l = sorted(set([i[:k-1] for i in kmers] + [i[1:k] for i in kmers]))
+    def labels_from_kmers(self, k, kmers):
+        if not self.paired:
+            l = set([i[:k-1] for i in kmers] + [i[1:k] for i in kmers])
             return l
         else:
-            klen = len(kmers[0]) # cache length
+            klen = self.k*2 # cache length
             hlen = int(klen/2) # cache half length
-            l = sorted(set([i[:hlen-2]+i[hlen:klen-1] for i in kmers]+[i[1:hlen-1]+i[hlen+1:klen] for i in kmers]))
+            l = set([i[:hlen-2]+i[hlen:klen-1] for i in kmers]+[i[1:hlen-1]+i[hlen+1:klen] for i in kmers])
 
             return l
 
 
     """ Returns the Debruijn graph as a GraphViz source string """
-    def export_graphviz(self, paired=False):
+    def export_graphviz(self):
         result = ''
         result += 'digraph {\n'
         result += '   graph [nodesep=2, size="300,300"];\n'
@@ -127,7 +139,7 @@ class graph:
         hlen = int(klen/2)
 
         for i in self.edges:
-            if paired:
+            if self.paired:
                 src = self.nodes[i[:hlen-2] + i[hlen:klen-1]].index
                 dst = self.nodes[i[1:hlen-1] + i[hlen+1:klen]].index
             else:
@@ -146,18 +158,50 @@ class graph:
     # TODO: Remove nodes/edges in contig from list, find more contigs
     def get_start(self):
         for n in self.nodes:
-            if self.nodes[n].get_degree() == -1 and self.nodes[n].in_degree == 0:
+            if self.nodes[n].in_degree == 0:
                 return self.nodes[n]
+
+    """ When called by get_chained_contigs, this will return the path travelled until
+    it reaches a branching point with out degree < 1 """
+    def get_contig_region(self,start = None, next = None):
+        node = start
+
+        """"
+        If we specified a node, set path = [start] and the node to check as next
+        """
+        if next == None:
+            path = []
+        else:
+            node = next
+            path = [start]
+
+        """
+        If path[start] != None, that means the edge (and trailing contigs)
+        have already been dealt with
+        """
+        if len(path) > 0 and self.contigs[path[0].label] != None:
+            return False
+
+        klen = self.k*2
+        hlen = int(klen/2)
+
+        while node.out_degree <= 1:
+            path.append(node)
+            if (len(node.edges) > 0):
+                node = self.nodes[node.edges[0].label[1:hlen-1]+node.edges[0].label[hlen+1:klen]]
+            else:
+                self.contigs[path[0].label] = path
+                return path[-1]
 
     """ Returns a list of all the contigs found starting from the given node;
     if no node is passed, the get_start() method is called to find a proper
     start """
-    def get_all_contigs(self, paired=False, node=None):
+    def get_chained_contigs(self, node=None):
         # Start at the beginning if we haven't started yet
         if node == None:
             node = self.get_start()
 
-        node = self.get_contig(node)
+        node = self.get_contig_region(node)
         contigs = []
 
         klen = self.k*2
@@ -173,36 +217,15 @@ class graph:
                     lindex = edge.label[:hlen-2] + edge.label[hlen:klen-1]
                     rindex = edge.label[1:hlen-1]+edge.label[hlen+1:klen]
 
-                node = self.get_contig(self.nodes[lindex],self.nodes[rindex])
+                node = self.get_contig_region(self.nodes[lindex],self.nodes[rindex])
 
-
-    """ When called by get_all_contigs, this will return the path travelled until
-    it reaches a branching point with out degree < 1 """
-    def get_contig(self,start = None, next = None, paired=False):
-        node = start
-        if next == None:
-            path = []
-        else:
-            node = next
-            path = [start]
-
-        klen = self.k*2
-        hlen = int(klen/2)
-
-        while node.out_degree <= 1:
-            path.append(node)
-            if (len(node.edges) > 0):
-                node = self.nodes[node.edges[0].label[1:hlen-1]+node.edges[0].label[hlen+1:klen]]
-            else:
-                self.contigs[path[0].label] = path
-                return path[-1]
 
     """ Turns the contigs in to their textual representations (with the kmers
     concatenated as a superstring) and saves them to a file.
     Default save location: 'Data/contigs.dat'
     """
-    def save_contigs(self, paired=False, path="Data/contigs.dat"):
-        self.get_all_contigs(paired)
+    def save_contigs(self, path="Data/contigs.dat"):
+        self.get_chained_contigs()
 
         start = True
         hlen = int(self.k/2)
@@ -221,57 +244,60 @@ class graph:
 
     """ Gets the GraphViz source from the export function, then saves it in a
     file to be used later by a program like gvedit, or the gv.save() function """
-    def save_graph(self, paired=False):
+    def save_graph(self):
         file = open("output.gv","w")
-        file.write(self.export_graphviz(paired))
+        file.write(self.export_graphviz())
         file.close()
         print("[DONE]   ->  Saving output as GraphViz compatible format")
 
+if __name__ == "__main__":
+    k = 31
 
-k = 31
-kmers = kmer.create_kmers(k,"Data/lseq.dat","Data/rseq.dat")
+    start = time.time()
 
-g = graph(k,kmers,True)
+    g = graph(k,True)
+    kmer.graph_from_sequences(g, k, "Data/lseq.dat", "Data/rseq.dat")
 
-g.save_contigs(True)
-g.save_graph(True)
+    g.save_contigs()
 
-"""
-print("[TASK]   ->  Performing basic local alignment search for resulting nucleotide sequence")
-sys.stdout.flush()
+    """
+    print("[TASK]   ->  Performing basic local alignment search for resulting nucleotide sequence")
+    sys.stdout.flush()
 
-nt_string = open("Data/contigs.dat").read()
-result_handle = NCBIWWW.qblast("blastn", "nt", nt_string)
+    nt_string = open("Data/contigs.dat").read()
+    result_handle = NCBIWWW.qblast("blastn", "nt", nt_string)
 
-sys.stdout.flush()
-with open("blast_results.xml", "w") as out_handle:
-    out_handle.write(result_handle.read())
-    result_handle.close()
-"""
+    sys.stdout.flush()
+    with open("blast_results.xml", "w") as out_handle:
+        out_handle.write(result_handle.read())
+        result_handle.close()
 
-print("[DONE]   ->  NCBI nucleotide blast top match:")
-from xml.dom import minidom
 
-def getText(nodelist):
-    rc = []
-    for node in nodelist:
-        if node.nodeType == node.TEXT_NODE:
-            rc.append(node.data)
-    return ''.join(rc)
+    print("[DONE]   ->  NCBI nucleotide blast top match:")
+    from xml.dom import minidom
 
-xmldoc = minidom.parse("blast_results.xml")
-hitlist = xmldoc.getElementsByTagName('Hit')
+    def getText(nodelist):
+        rc = []
+        for node in nodelist:
+            if node.nodeType == node.TEXT_NODE:
+                rc.append(node.data)
+        return ''.join(rc)
 
-count = 0
-for node in hitlist:
-    if count < 0:
-        break
-    count -= 1
+    xmldoc = minidom.parse("blast_results.xml")
+    hitlist = xmldoc.getElementsByTagName('Hit')
 
-    hit_ids = node.getElementsByTagName('Hit_id')
-    for id in hit_ids:
-        print(id.childNodes[0].nodeValue)
+    count = 0
+    for node in hitlist:
+        if count < 0:
+            break
+        count -= 1
 
-    Hit_def = node.getElementsByTagName('Hit_def')
-    for id in Hit_def:
-        print(id.childNodes[0].nodeValue)
+        hit_ids = node.getElementsByTagName('Hit_id')
+        for id in hit_ids:
+            print(id.childNodes[0].nodeValue)
+
+        Hit_def = node.getElementsByTagName('Hit_def')
+        for id in Hit_def:
+            print(id.childNodes[0].nodeValue)
+    """
+    print("Elapsed: %f"%(time.time() - start))
