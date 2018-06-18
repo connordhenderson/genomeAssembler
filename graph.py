@@ -1,17 +1,5 @@
 import kmer
 
-class vertex:
-    def __init__(self, label, index):
-        self.index = index
-        self.label = label
-        self.outs = []
-
-class edge:
-    def __init__(self, l, r):
-        self.left = l
-        self.right = r
-        self.label = ""
-
 class graph:
     def __init__(self, kmers, k=9):
         """
@@ -25,11 +13,10 @@ class graph:
         self.k = k
         self.edges = []
         self.edge_labels = []
-        self.indices = {v:i for i,v in enumerate(vlist)}
-        self.vertices = {i:v for i,v in enumerate(vlist)}
 
-        self.start = None
-        self.end = None
+        for i in range(len(vlist)):
+            self.indices[v] = i
+            self.vertex[i] = v
 
         self.create_edges(kmers)
 
@@ -40,13 +27,20 @@ class graph:
         self.vertices[i] = label
 
     """ Creates a directed edge between specified vertices"""
-    def add_edge(self, vsrc, vdst, label='', repeats=False):
+    def add_edge(self, vsrc, vdst, label='', repeats=True):
         e = (self.indices[vsrc], self.indices[vdst])
         if (repeats) or (e not in self.edges):
             self.edges.append(e)
             self.edge_labels.append(label)
 
     def create_edges(self, kmers):
+        l = []
+        for i in range(len(kmers) - 1):
+            if kmers[i + 1].startswith(kmers[i]):
+                l.append(i+1)
+        for i in reversed(range(len(l))):
+            kmers.pop(l[i-1])
+
         for i in kmers:
             self.add_edge(i[:self.k-1], i[1:self.k], i)
 

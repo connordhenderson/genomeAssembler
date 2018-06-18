@@ -73,7 +73,7 @@ def clean_data(path, save):
 Initiates the process to trim the data, then write it to a file
 """
 def clean_paired_data(lpath, rpath, lsave, rsave):
-    pqual = 70
+    pqual = 40
 
     lseqlist = []
     rseqlist = []
