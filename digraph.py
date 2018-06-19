@@ -73,6 +73,7 @@ class graph:
     def add_kmers(self, km):
         for i,v in enumerate(self.labels_from_kmers(self.k, km)):
             if (self.nodes.get(v) == None):
+                print(v)
                 self.nodes[v] = node(self.count, v, self.paired)
                 self.indices[self.count] = v
                 self.count += 1
@@ -87,12 +88,13 @@ class graph:
         klen = self.k * 2
         hlen = int(klen/2)
 
+
         if not self.paired:
             lindex = edge.label[:-1]
             rindex = edge.label[1:]
         else:
-            lindex = edge.label[:hlen-2] + edge.label[hlen:klen-1]
-            rindex = edge.label[1:hlen-1]+edge.label[hlen+1:klen]
+            lindex = edge.label[:hlen-1] + edge.label[hlen:klen-1]
+            rindex = edge.label[1:hlen]+edge.label[hlen+1:klen]
 
         """ Create the edges and update the degrees for the nodes """
         if edge.label not in self.edges.keys():
@@ -117,8 +119,10 @@ class graph:
         else:
             klen = self.k*2 # cache length
             hlen = int(klen/2) # cache half length
-            l = set([i[:hlen-2]+i[hlen:klen-1] for i in kmers]+[i[1:hlen-1]+i[hlen+1:klen] for i in kmers])
+            l = set([i[:hlen-1]+i[hlen:klen-1] for i in kmers]+[i[1:hlen]+i[hlen+1:klen] for i in kmers])
 
+            print(l)
+            print()
             return l
 
 
@@ -140,8 +144,8 @@ class graph:
 
         for i in self.edges:
             if self.paired:
-                src = self.nodes[i[:hlen-2] + i[hlen:klen-1]].index
-                dst = self.nodes[i[1:hlen-1] + i[hlen+1:klen]].index
+                src = self.nodes[i[:hlen-1] + i[hlen:klen-1]].index
+                dst = self.nodes[i[1:hlen] + i[hlen+1:klen]].index
             else:
                 src = self.nodes[i[:-1]].index
                 dst = self.nodes[i[1:]].index
@@ -251,14 +255,17 @@ class graph:
         print("[DONE]   ->  Saving output as GraphViz compatible format")
 
 if __name__ == "__main__":
-    k = 31
+    k = 7
 
     start = time.time()
 
     g = graph(k,True)
     kmer.graph_from_sequences(g, k, "Data/lseq.dat", "Data/rseq.dat")
 
-    g.save_contigs()
+    g.save_graph()
+
+    from graphviz import render
+    render("dot","png","output.gv")
 
     """
     print("[TASK]   ->  Performing basic local alignment search for resulting nucleotide sequence")
