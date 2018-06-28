@@ -1,16 +1,25 @@
 import sys, time
-import kmer
+import kmer, sqldb
 from Bio.Blast import NCBIWWW
 
 """
 This class is used to create an edge between two nodes in our graph
 The label of the edge is the k-mer, or the paired k-mers after they've been
-concatenated
+concatenated. It's stored in an SQL table with the edge index as a lookup number
 """
 class edge:
-    def __init__(self, label):
-        self.label = label
+    def __init__(self, db, index, label):
+        self.db = db
+        self.index = index
         self.multiplicity = 1
+
+        if self.db.edges.has(label):
+            self.index = self.db.edges.get_id(label)
+        else:
+            self.db.edges.add(index, label)
+
+    def label(self):
+        return self.db.edges.get_str(self.index)
 
     def __hash__(self):
         """ A custom hash so we can see if our edge is contained in a set """
@@ -23,26 +32,36 @@ class edge:
 """
 This class is used to create a node on the graph, representing either the prefix
 or suffix of the k-mer. For a set of paired k-mers, this is the prefix/suffix of
-both k-mers, concatenated for the label. Stores connecting edge information
+both k-mers, concatenated for the label. The prefix/suffix is stored in a lookup
+table to cut memory usage. Stores connecting edge information
 """
 class node:
-    def __init__(self, index, label, paired=False):
-        self.label = label
+    def __init__(self, db, index, label, paired=False):
+        self.db = db
         self.edges = []
         self.index = index
 
         self.in_degree = 0
         self.out_degree = 0
 
+        if self.db.nodes.has(label):
+            self.index = self.db.nodes.get_id(label)
+        else:
+            self.db.nodes.add(index, label)
+
+    """ return the label of the node from the database """
+    def label(self):
+        return self.db.nodes.get_str(self.index)
+
     def __eq__(self, other):
         return isinstance(other, self.__class__) and getattr(other,'label', None)
 
     def __hash__(self):
         """ A custom hash so we can see if our edge is contained in a set """
-        return hash(self.label)
+        return hash(self.db.get(index))
 
     def __str__(self):
-        return "%s[%s]" % (self.index, self.label)
+        return "%s[%s]" % (self.index, self.db.get(index))
 
     def get_degree(self):
         return self.in_degree - self.out_degree
@@ -50,16 +69,17 @@ class node:
 This will create a directed graph (Debruijn graph) from a set of k-mers
 Specify the k-length of the kmers, as well as the kmers previously created, and
 whether or not this is a paired graph
-TODO: Verify unpaired graph creation is unaffected by implementation of pairs
 """
 class graph:
-    def __init__(self, k, paired=False, kmers=None):
+    def __init__(self, k, paired=True, kmers=None):
         self.k = k
+        self.db = sqldb.db("db/mydb")
         self.edges = dict()
         self.nodes = dict()
         self.indices = dict()
         self.contigs = dict()
         self.count = 0
+        self.edge_index = 0
 
         self.paired = paired
 
@@ -67,19 +87,26 @@ class graph:
             self.add_kmers(kmers,paired)
 
             for i in kmers:
-                e = edge(i)
+                e = edge(self.db, i)
                 self.add_edge(e, paired)
 
     def add_kmers(self, km):
         for i,v in enumerate(self.labels_from_kmers(self.k, km)):
             if (self.nodes.get(v) == None):
-                self.nodes[v] = node(self.count, v, self.paired)
+                self.nodes[v] = node(self.db, self.count, v, self.paired)
                 self.indices[self.count] = v
                 self.count += 1
 
+                if self.count % 10000 == 0:
+                    print("[%.2f]"% (self.count / 79495092))
+                    sys.stdout.flush()
+
         for i in km:
-            e = edge(i)
+            e = edge(self.db, self.edge_index, i)
             self.add_edge(e)
+            self.edge_index += 1
+
+
 
     """ Create an edge, then add it to the graph; where the passed edge
     is a kmer string """
@@ -88,15 +115,15 @@ class graph:
         hlen = int(klen/2)
 
         if not self.paired:
-            lindex = edge.label[:-1]
-            rindex = edge.label[1:]
+            lindex = edge.label()[:-1]
+            rindex = edge.label()[1:]
         else:
-            lindex = edge.label[:hlen-2] + edge.label[hlen:klen-1]
-            rindex = edge.label[1:hlen-1]+edge.label[hlen+1:klen]
+            lindex = edge.label()[:hlen-2] + edge.label()[hlen:klen-1]
+            rindex = edge.label()[1:hlen-1]+edge.label()[hlen+1:klen]
 
         """ Create the edges and update the degrees for the nodes """
-        if edge.label not in self.edges.keys():
-            self.edges[edge.label] = edge
+        if edge.label() not in self.edges.keys():
+            self.edges[edge.label()] = edge
             self.nodes[lindex].edges.append(edge)
 
             self.nodes[rindex].in_degree += 1
@@ -104,7 +131,7 @@ class graph:
         else:
             """ Currently unused; may be valid for determining low occurence
             rates for data cleaning """
-            self.edges[edge.label].multiplicity += 1
+            self.edges[edge.label()].multiplicity += 1
 
 
 
@@ -188,9 +215,9 @@ class graph:
         while node.out_degree <= 1:
             path.append(node)
             if (len(node.edges) > 0):
-                node = self.nodes[node.edges[0].label[1:hlen-1]+node.edges[0].label[hlen+1:klen]]
+                node = self.nodes[node.edges[0].label()[1:hlen-1]+node.edges[0].label()[hlen+1:klen]]
             else:
-                self.contigs[path[0].label] = path
+                self.contigs[path[0].label()] = path
                 return path[-1]
 
     """ Returns a list of all the contigs found starting from the given node;
@@ -211,11 +238,11 @@ class graph:
         while node != False and node.out_degree > 0:
             for edge in node.edges:
                 if not paired:
-                    lindex = edge.label[:-1]
-                    rindex = edge.label[1:]
+                    lindex = edge.label()[:-1]
+                    rindex = edge.label()[1:]
                 else:
-                    lindex = edge.label[:hlen-2] + edge.label[hlen:klen-1]
-                    rindex = edge.label[1:hlen-1]+edge.label[hlen+1:klen]
+                    lindex = edge.label()[:hlen-2] + edge.label()[hlen:klen-1]
+                    rindex = edge.label()[1:hlen-1]+edge.label()[hlen+1:klen]
 
                 node = self.get_contig_region(self.nodes[lindex],self.nodes[rindex])
 
@@ -235,9 +262,9 @@ class graph:
             for contig in contigs:
                 for node in contigs[contig]:
                     if start:
-                        file.write(node.label[:hlen-1])
+                        file.write(node.label()[:hlen-1])
                         start = False
-                    file.write(node.label[:hlen][-1])
+                    file.write(node.label()[:hlen][-1])
 
 
         print("[DONE]   ->  Contiguous regions saved; %i found"%len(contigs))
