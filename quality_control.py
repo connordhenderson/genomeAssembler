@@ -88,8 +88,11 @@ def clean_paired_data(lpath, rpath, lsave, rsave):
                 rseq, rqual = next(liter)[1:]
 
                 if ord(min(lqual)) >= pqual and ord(min(rqual)) >= pqual:
-                    lseqlist.append(lseq)
-                    rseqlist.append(rseq)
+                    if len(lseq) == len(rseq):
+                        lseqlist.append(lseq)
+                        rseqlist.append(rseq)
+                    else:
+                        print("size mismatch")
 
             except StopIteration:
                 print("EOF")

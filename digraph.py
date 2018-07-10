@@ -1,6 +1,8 @@
 import sys, time
 import kmer, sqldb
 from Bio.Blast import NCBIWWW
+from timer import timer
+from graph import graph as gr
 
 """
 This class is used to create an edge between two nodes in our graph
@@ -72,6 +74,8 @@ whether or not this is a paired graph
 """
 class graph:
     def __init__(self, k, paired=True, kmers=None):
+        self.x = []
+        self.test = True
         self.k = k
         self.db = sqldb.db("db/mydb")
         self.edges = dict()
@@ -97,16 +101,10 @@ class graph:
                 self.indices[self.count] = v
                 self.count += 1
 
-                if self.count % 10000 == 0:
-                    print("[%.2f]"% (self.count / 79495092))
-                    sys.stdout.flush()
-
         for i in km:
             e = edge(self.db, self.edge_index, i)
             self.add_edge(e)
             self.edge_index += 1
-
-
 
     """ Create an edge, then add it to the graph; where the passed edge
     is a kmer string """
@@ -157,8 +155,8 @@ class graph:
         for i in self.nodes:
             node = self.nodes[i]
 
-            lenl = int(len(node.label)/2)
-            l = str(node.index)+"["+node.label[:lenl] + "_" + node.label[lenl:]+"]"
+            lenl = int(len(node.label())/2)
+            l = str(node.index)+"["+node.label()[:lenl] + "_" + node.label()[lenl:]+"]"
 
             result += '    N%d [shape="box", style="rounded", label="%s"];\n' % (node.index, l)
 
@@ -286,6 +284,7 @@ if __name__ == "__main__":
     kmer.graph_from_sequences(g, k, "Data/lseq.dat", "Data/rseq.dat")
 
     g.save_contigs()
+    g.save_graph()
 
     """
     print("[TASK]   ->  Performing basic local alignment search for resulting nucleotide sequence")

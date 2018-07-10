@@ -4,11 +4,10 @@ import utility, quality_control
 def start(test=False):
     start = time.time()
 
-    k = 20
+    k = 21
     lpath = ""
     rpath = ""
     clean = True
-    test = False
 
     """
     Attempt to get the proper arguments; kmer size, file path
@@ -20,19 +19,12 @@ def start(test=False):
             lpath = str(arg[2:])
         if arg.startswith("r="):
             rpath = str(arg[2:])
-        if arg.startswith("t="):
-            test = arg[2:]
-
     """
     Clean the data
     """
-    if test == False:
-        quality_control.clean_paired_data(lpath, rpath, "Data/lseq.dat", "Data/rseq.dat")
-
-        print("[DONE]   ->  data trimmed")
-    else:
-        print("[SKIP]   ->  data cleaning skipped")
-
+    quality_control.clean_paired_data(lpath, rpath, "Data/lseq.dat", "Data/rseq.dat")
+    
+    print("[DONE]   ->  data trimmed")
 
 if sys.argv[0] == 'main.py':
     start()
